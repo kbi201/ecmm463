@@ -11,9 +11,8 @@ authors:
   - given-names: Darren
     family-names: Gigatama
     affiliation: University of Exeter
-  - given-names: Kelly
+  - given-names: Kelly Blanca
     family-names: Irahola Vallejos
-    name-particle: B
     affiliation: University of Exeter
 repository-code: 'https://github.com/kbi201/ecmm463'
 abstract: >-
