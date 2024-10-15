@@ -1,11 +1,28 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+title: ECMM463
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
 authors:
-  - family-names: Gigatama, Irahola
-    given-names: Darren, Kelly
-title: "ECMM463"
-version: 1
-identifiers:
-  - type: --
-    value: --
-date-released: 2024-12-15
+  - given-names: Darren
+    family-names: Gigatama
+    affiliation: University of Exeter
+  - given-names: Kelly
+    family-names: Irahola Vallejos
+    name-particle: B
+    affiliation: University of Exeter
+repository-code: 'https://github.com/kbi201/ecmm463'
+abstract: >-
+  An implementation of the method described in "Phishing URL
+  Detection: A Network-based Approach Robust to Evasion" by
+  Kim, Taeri and Park, Noseong and Hong, Jiwon and Kim,
+  Sang-Wook
+keywords:
+  - phishing
+commit: '1'
+version: '1'
+date-released: '2024-12-15'
