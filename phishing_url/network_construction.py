@@ -5,18 +5,25 @@ import pickle
 import gzip
 from urllib.parse import urlparse
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 # init graph and mock dataset
 g = nx.Graph()
 
+"""
+# dummy dataset
 url_data = [
     {"url": "http://username:password@www.example.com/path/to/resource?query=example&source=browser"},
     {"url": "https://phishy-site.com/login?user=test&pass=1234"},
     {"url" : "http://antitrust.altervista.org/wwww.popularenlinea.com.do"},
     {"url" : "http://antitrust.altervista.org/wwww.testing.com.do?query=example&source=browser"}
 ]
+"""
 
+df = pd.read_csv("phishing_url/data/subset_of_data.csv", names=['url', 'label'], skiprows=1)
+urls = df['url'] # segment into urls, and labels
+labels = df['label']
 
 """ 
 This function segments URL into words
@@ -67,15 +74,20 @@ Returns:
 """
 def add_to_graph(url_entry):
     url = url_entry["url"] # fetch url
+    if not url.startswith(("http://", "https://")): url = "http://" + url
     parsed = urlparse(url) # parse the url
+    #print(parsed)
 
     # Create URL node
-    url_node = f"URL: {url}"
+    url_node = f"{url}" # URL
     g.add_node(url_node, type="URL")
+
+    
+    print(url)
 
     # adding edge from URL to DOMAIN
     if parsed.hostname:
-        domain_node = f"Domain:{parsed.hostname}"
+        domain_node = f"{parsed.hostname}" # domain
 
         # Check if the domain node already exists in the graph, and add if not exist else reuse the domain
         if not g.has_node(domain_node):
@@ -87,15 +99,13 @@ def add_to_graph(url_entry):
     # Segment URL into words and create nodes for each word
     words = segment_url(url)
     for word in words:
-        word_node = f"Word:{word}"
-        g.add_node(word_node, type="Word")
+        word_node = f"{word}"
+        g.add_node(word_node, type="Word") # word
         g.add_edge(url_node, word_node)
 
-
-
 # Create graph .....
-for entry in url_data:
-    add_to_graph(entry)
+for idx, row in df.iterrows():
+    add_to_graph(row)
 
 # visualise the graph plot
 def visualise_graph(graph):
@@ -107,9 +117,9 @@ def visualise_graph(graph):
     domain_nodes = [n for n, attr in graph.nodes(data=True) if attr.get('type') == 'Domain']
     word_nodes = [n for n, attr in graph.nodes(data=True) if attr.get('type') == 'Word']
 
-    nx.draw_networkx_nodes(graph, pos, nodelist=url_nodes, node_size=500, node_color="skyblue", label="URLs")
-    nx.draw_networkx_nodes(graph, pos, nodelist=domain_nodes, node_size=500, node_color="lightgreen", label="Domains")
-    nx.draw_networkx_nodes(graph, pos, nodelist=word_nodes, node_size=500, node_color="salmon", label="Words")
+    nx.draw_networkx_nodes(graph, pos, nodelist=url_nodes, node_size=400, node_color="blue", label="URLs")
+    nx.draw_networkx_nodes(graph, pos, nodelist=domain_nodes, node_size=500, node_color="green", label="Domains")
+    nx.draw_networkx_nodes(graph, pos, nodelist=word_nodes, node_size=200, node_color="red", label="Words")
 
     # Draw edges and labels
     nx.draw_networkx_edges(graph, pos, edge_color="gray", alpha=0.5)
@@ -121,10 +131,11 @@ def visualise_graph(graph):
 
 # Call the visualization function
 visualise_graph(g)
+print(g)
 
 # save graph to data/
 with gzip.open('phishing_url/data/graph.gzpickle', 'wb') as f:
     pickle.dump(g, f)
 
-print("Graph construction complete.")
+print("Graph complete.")
 

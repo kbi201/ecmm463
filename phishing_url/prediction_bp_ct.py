@@ -157,6 +157,8 @@ def main():
         print(mal,bn)
 
         # set distances for all edges
+
+        ## so it looks like embeddings are loaded in seperately from the graph rather than embedding graph nodes themselves?, looks optional however
         if type_emb == 'None':
             type_emb = None
         if type_emb != None:
