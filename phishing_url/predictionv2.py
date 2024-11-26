@@ -19,22 +19,21 @@ from gensim.models import KeyedVectors
 # from sklearn.metrics.pairwise import rbf_kernel
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
-
-
-# type_sim = None, 'rbf', 'minmax', 'cos'
-type_sim = "minmax" # type of similarity
-type_emb = "node2vec"
-
 """
 we are using dataset found in  https://raw.githubusercontent.com/faizann24/Using-machine-learning-to-detect-malicious-URLs/refs/heads/master/data/data.csv
 this does not use community truth but are labelled good/bad
     - we therefore remove community truths as wont be used
 """
-def main(type_sim = "minmax", type_emb = "node2vec"):
+def main():
 
+    # type_compat = 'table1', 'table2', 'table3'
+    # type_emb = None, 'deepwalk', 'node2vec', 'doc2vec', 'word2vec'
+    # compat_threshold1, 2 = None, 0.3, 0.5, 0.7
+    # type_sim = None, 'rbf', 'minmax', 'cos'
+    # ct_type = 'ct1_2', 'ct1_3', 'ct1_4', 'ct2', 'ct3_2', 'ct3_3', 'ct3_4'
     type_emb = 'node2vec'
-    type_sim = 'minmax'
-    type_compat = 'table3'
+    type_sim = 'cos'
+    type_compat = 'table2'
     compat_threshold1 = 0.7
     compat_threshold2 = 0.7
     
@@ -47,7 +46,7 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
     print("Done ...")
 
 
-    N_FOLDS = 2
+    N_FOLDS = 3
     max_epoch = 3
 
     kf = KFold(n_splits=N_FOLDS, shuffle=True)
@@ -84,9 +83,9 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
 
         for node in test_set:
             if url_truth.loc[url_truth['url'] == node, 'label'].values[0] == "bad":
-                relevant_training.add(node)
+                relevant_test.add(node)
             elif  url_truth.loc[url_truth['url'] == node, 'label'].values[0] == "good":
-                irrelevant_training.add(node)
+                irrelevant_test.add(node)
             else:
                 print("error: ground truth error")
 
@@ -95,13 +94,13 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
         for node in g.nodes():
             g.nodes[node]['label'] = None
             g.nodes[node]['best_label'] = -1
-            g.nodes[node]['data_cost'] = [0.5, 0.5]
+            g.nodes[node]['data_cost'] = [0.5, 0.5] # default beliefs about being phishy or beneign following polonium heurisitic
 
             # msg box is a dict
-            g.nodes[node]['msgbox'] = {}
-            g.nodes[node]['msg_comp'] = [0, 0]
+            g.nodes[node]['msgbox'] = {} # this will maintain a list of each message being passed to each neighbour
+            g.nodes[node]['msg_comp'] = [0, 0] # initialising iysmessages to be passed onto the neighbours
             for nbr in list(g.neighbors(node)):
-                g.nodes[node]['msgbox'][nbr] = [0, 0]
+                g.nodes[node]['msgbox'][nbr] = [0, 0] 
    
         """
         for each node belonging in the training set we want to give it a label where 
@@ -113,7 +112,7 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
         
         mal = 0 # malicious counter
         bn = 0 # beniegn counter
-        print(training_set)
+        #print(training_set)
 
         for node in has_ground_truth:
             if node in training_set:
@@ -149,7 +148,7 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
             min_dist = float("inf")
             max_dist = -float("inf")
             
-            
+            # calculating edge potentials using similarity approach providied to calculate distance
             for edge in g.edges():
 
                 if type_sim == 'minmax':
@@ -174,7 +173,6 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
                     g.edges[edge]['sim'] = 1 - np.divide((g.edges[edge]['distance'] - min_dist), max_dist-min_dist)
             
             print("embedding done")
-            visualisie_graph(g)
         # if type_emb not provided...
         else:
             # set initial messages
@@ -196,12 +194,21 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
             f1score = float(0)
             accuracy = float(0)
 
+            #visualisie_graph(g)
             step(g, type_compat, compat_threshold1=compat_threshold1, compat_threshold2=compat_threshold2)
             print("Iteration: {} MAP: {}".format(epoch + 1, MAP(g)))
+            #visualisie_graph(g)
+
+
+            #print(relevant_test, "\n")
+            #print(g.nodes)
 
             relevant_correctness = 0
             relevant_incorrectness = 0
             for i in relevant_test:
+                if not i.startswith(("http://", "https://")): 
+                    i = "http://" + i
+                    
                 if g.nodes[i]['best_label'] == 1:
                     relevant_correctness += 1
                 else:
@@ -210,6 +217,10 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
             irrelevant_correctness = 0
             irrelevant_incorrectness = 0
             for i in irrelevant_test:
+                if not i.startswith(("http://", "https://")): 
+                    i = "http://" + i
+                    
+
                 if g.nodes[i]['best_label'] == 0:
                     irrelevant_correctness += 1
                 else:
@@ -262,12 +273,22 @@ def main(type_sim = "minmax", type_emb = "node2vec"):
 
 
 
+"""
+This function propogates message
+--------------------------------
+
+each step send a message from a node to its neighbours
+    - dont sent a message to a labelled node as obesrved variables do not recieve messages
+    - if sending from a labelled node use _send_msg_label, else _send_msg where the largest diff comes from how the message is calculated
+"""
 def step(G, type_compat, compat_threshold1=None, compat_threshold2=None):
-    for n in tqdm(G.nodes(), desc="Propagate from vertices with label", mininterval=0.5):
+    for n in tqdm(G.nodes(), desc="Propagate from vertices with label", mininterval=0.5): # tqdm inits a progress bar
         if G.nodes[n]['label'] != None:
             for nbr in G.neighbors(n):
                 # do not propagate to nodes with label
                 if G.nodes[nbr]['label'] == None:
+
+                    #print("HIDDEN", nbr)
                     _send_msg_label(G, n, nbr)
     #for n in tqdm(G.nodes(), desc="Compiling message boxes 1", mininterval=0.5):
     #    G.nodes[n]['msg_comp'] = [0, 0]
@@ -286,7 +307,9 @@ def step(G, type_compat, compat_threshold1=None, compat_threshold2=None):
     #        G.nodes[n]['msg_comp'][0] += G.nodes[n]['msgbox'][nbr][0]
     #        G.nodes[n]['msg_comp'][1] += G.nodes[n]['msgbox'][nbr][1]
 
-
+"""
+calculates the message for hidden variables/nodes
+"""
 def _min_sum(G, _from, _to, type_compat, compat_threshold1, compat_threshold2):
     eps = 0.001
 
@@ -335,14 +358,19 @@ def _min_sum(G, _from, _to, type_compat, compat_threshold1, compat_threshold2):
             p_related += np.max([compat_threshold2, G[_to][_from]['sim']]) if i == 0 else np.min([compat_threshold1, 1 - G[_to][_from]['sim']])
             
         new_msg[i] = min(p_not_related, p_related)
+        #print(new_msg)
 
     # Normalization
     # new_msg = np.exp(new_msg) / np.sum(np.exp(new_msg))
 
     return new_msg
 
-
+"""
+This function propogates messages from labelled nodes
+if from node is maliciious then msg = [1, 0] else benign is [0, 1]
+"""
 def _send_msg_label(G, _from, _to):
+    #print(f"FROM   {G.nodes[_from]}" )
     # if lable is given
     if G.nodes[_from]['label'] == 1:
         msg = [1, 0]
@@ -353,14 +381,22 @@ def _send_msg_label(G, _from, _to):
         msg = G.nodes[_from]['data_cost']
 
     to_node = G.nodes[_to]
+    #print(msg, to_node)
+    #print("\n", to_node['msg_comp'][0], to_node['msgbox'][_from][0])
+
+
     # subtract original msg
     to_node['msg_comp'][0] -= to_node['msgbox'][_from][0]
     to_node['msg_comp'][1] -= to_node['msgbox'][_from][1]
+    #print("\n", to_node['msg_comp'][0], to_node['msgbox'][_from][0])
+
     # add new msg
     to_node['msg_comp'][0] += msg[0]
     to_node['msg_comp'][1] += msg[1]
+
     # orignal msg := new msg
     to_node['msgbox'][_from] = msg
+    #print(f"FROM   {G.nodes[_from]}    TO     {G.nodes[_to]['msg_comp'][0]} \n", )
 
 
 def _send_msg(G, type_compat, _from, _to, compat_threshold1 = None, compat_threshold2 = None):
@@ -368,9 +404,10 @@ def _send_msg(G, type_compat, _from, _to, compat_threshold1 = None, compat_thres
     msg = _min_sum(G, _from, _to, type_compat, compat_threshold1, compat_threshold1)
 
     to_node = G.nodes[_to]
-    # subtract original msg
+    # subtract original msg from from node
     to_node['msg_comp'][0] -= to_node['msgbox'][_from][0]
     to_node['msg_comp'][1] -= to_node['msgbox'][_from][1]
+     
     # add new msg
     to_node['msg_comp'][0] += msg[0]
     to_node['msg_comp'][1] += msg[1]
@@ -378,27 +415,26 @@ def _send_msg(G, type_compat, _from, _to, compat_threshold1 = None, compat_thres
     to_node['msgbox'][_from] = msg
 
 
+
+"""
+This function is used to evalatue perfomance of belief propgoation
+"""
 def MAP(G):
     n_wrong_label = 0
     n_correct_label = 0
 
     for n in G.nodes():
+        #print(G.nodes[n])
         nodedata = G.nodes[n]
 
         cost_not_related = 0
         cost_related = 0
 
-        #cost_not_related += math.log(1 - G.node[n]['data_cost'][0])
-        #cost_related += math.log(1 - G.node[n]['data_cost'][1])
+        # data costs
         cost_not_related += nodedata['data_cost'][0]
         cost_related += nodedata['data_cost'][1]
 
-        #for nbr, msg in nodedata['msgbox'].items():
-        #    cost_not_related += msg[0]
-        #    cost_related += msg[1]
-        #for edge, eattr in G[n].items():
-        #    cost_not_related += eattr['msg'][0]
-        #    cost_related += eattr['msg'][1]
+        # msg comp
         cost_not_related += nodedata['msg_comp'][0]
         cost_related += nodedata['msg_comp'][1]
 
@@ -407,20 +443,29 @@ def MAP(G):
         else:
             nodedata['best_label'] = 0
 
-        if nodedata['label'] == 1 and nodedata['best_label'] == 0:
+        
+        #print(cost_related, cost_not_related, nodedata['best_label'], nodedata['label'])
+
+        # as we are only checking labelled nodes, only concerned with url nodes
+        if (nodedata['label'] == 1 and nodedata['best_label'] == 0) or (nodedata['label'] == 0 and nodedata['best_label'] == 1) :
             #print("error2: wrong label!")
             n_wrong_label += 1
-        elif nodedata['label'] == 0 and nodedata['best_label'] == 1:
-            #print("error2: wrong label!")
-            n_wrong_label += 1
-        elif nodedata['label'] == 1 and nodedata['best_label'] == 1:
+    
+        elif (nodedata['label'] == 1 and nodedata['best_label'] == 1) or (nodedata['label'] == 0 and nodedata['best_label'] == 0):
             n_correct_label += 1
-        elif nodedata['label'] == 0 and nodedata['best_label'] == 0:
-            n_correct_label += 1
+        else:
+            pass
 
     print("# wrong label: " + str(n_wrong_label))
     print("# correct label: " + str(n_correct_label))
+    
 
+
+    """
+    energy in this case looks like some measure of distance or metric, whereby the larger indicates 
+        - higher datacosts assigned per label
+        - more misclassifications as there are more discrepancies between predicted "best label" and curr label
+    """
     energy = 0
     for n in G.nodes():
         cur_label = G.nodes[n]['best_label']

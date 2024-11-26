@@ -19,7 +19,7 @@ url_data = [
     {"url" : "http://antitrust.altervista.org/wwww.testing.com.do?query=example&source=browser"}
 ]
 """
-
+# subset_of_data
 df = pd.read_csv("phishing_url/data/subset_of_data.csv", names=['url', 'label'], skiprows=1)
 urls = df['url'] # segment into urls, and labels
 labels = df['label']
@@ -58,7 +58,7 @@ def segment_url(url):
 
     # Remove empty strings and stop words
     words = {word for word in words if word and len(word) > 1}  
-    print(words)
+    #print(words)
     return words
 
 """
@@ -127,8 +127,8 @@ def visualise_graph(graph):
     plt.show()
 
 # Call the visualization function
-visualise_graph(g)
-print(g)
+#visualise_graph(g)
+#print(g)
 
 # Create and save node2vec embeddings
 node2vec = Node2Vec(g, dimensions=64, walk_length=10, num_walks=100, workers=4)
