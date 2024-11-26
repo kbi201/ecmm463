@@ -1,12 +1,11 @@
 import networkx as nx
-import requests, pickle
 import re
 import pickle
 import gzip
 from urllib.parse import urlparse
 import matplotlib.pyplot as plt
 import pandas as pd
-
+from node2vec import Node2Vec
 
 # init graph and mock dataset
 g = nx.Graph()
@@ -81,9 +80,7 @@ def add_to_graph(url_entry):
     # Create URL node
     url_node = f"{url}" # URL
     g.add_node(url_node, type="URL")
-
-    
-    print(url)
+    #print(url)
 
     # adding edge from URL to DOMAIN
     if parsed.hostname:
@@ -133,9 +130,16 @@ def visualise_graph(graph):
 visualise_graph(g)
 print(g)
 
-# save graph to data/
+# Create and save node2vec embeddings
+node2vec = Node2Vec(g, dimensions=64, walk_length=10, num_walks=100, workers=4)
+model = node2vec.fit()
+
+# save data to data/ dir
 with gzip.open('phishing_url/data/graph.gzpickle', 'wb') as f:
     pickle.dump(g, f)
+
+with gzip.open("phishing_url/data/graph_embeddings.emb.gzpickle", 'wb') as f:
+    pickle.dump(model.wv, f)  # Saving the word embeddings
 
 print("Graph complete.")
 
