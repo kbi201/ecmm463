@@ -1,10 +1,7 @@
-import sys
 import pickle
 import networkx as nx
-import math
 import numpy as np
 import gzip
-import random
 import warnings
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,7 +13,7 @@ from tqdm import tqdm
 from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
 
-# from sklearn.metrics.pairwise import rbf_kernel
+
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 """
@@ -33,7 +30,7 @@ def main():
     # ct_type = 'ct1_2', 'ct1_3', 'ct1_4', 'ct2', 'ct3_2', 'ct3_3', 'ct3_4'
     type_emb = 'node2vec'
     type_sim = 'cos'
-    type_compat = 'table2'
+    type_compat = 'table3'
     compat_threshold1 = 0.7
     compat_threshold2 = 0.7
     
@@ -68,9 +65,11 @@ def main():
         relevant_test = set()
         irrelevant_test = set()
 
-        #print(training_set)
 
         # node == url in the training set
+        """
+        
+        """
         for node in training_set:
 
             # checking df for circumstances where urls match, returning label field, with first occurence (we assume one occurence of each url anyways)
@@ -148,7 +147,9 @@ def main():
             min_dist = float("inf")
             max_dist = -float("inf")
             
-            # calculating edge potentials using similarity approach providied to calculate distance
+            """
+            calculating edge potentials using simialrity based on some distance measure between nodes, weher that is equclidian distance etc ..
+            """
             for edge in g.edges():
 
                 if type_sim == 'minmax':
@@ -194,7 +195,7 @@ def main():
             f1score = float(0)
             accuracy = float(0)
 
-            #visualisie_graph(g)
+            #visualise_graph(g)
             step(g, type_compat, compat_threshold1=compat_threshold1, compat_threshold2=compat_threshold2)
             print("Iteration: {} MAP: {}".format(epoch + 1, MAP(g)))
             #visualisie_graph(g)
@@ -342,7 +343,9 @@ def _min_sum(G, _from, _to, type_compat, compat_threshold1, compat_threshold2):
             # original (we think this version is for sum-product...)
             #p_not_related += 0.5 + eps if i == 0 else 0.5 - eps
             #p_related += 0.5 - eps if i == 0 else 0.5 + eps
-            p_not_related += 0.5 - eps if i == 0 else 0.5 + eps
+
+            """ using Polonium based Heurisitic. chose of heuristic is likely dependent on similarity measures used"""
+            p_not_related += 0.5 - eps if i == 0 else 0.5 + eps 
             p_related += 0.5 + eps if i == 0 else 0.5 - eps
         elif type_compat == 'table2':
             # original (this version works only when table2 && cos)
@@ -354,6 +357,14 @@ def _min_sum(G, _from, _to, type_compat, compat_threshold1, compat_threshold2):
             p_related += G[_from][_to]['distance'] if i == 0 else 0
         elif type_compat == 'table3':
             # original (our sim are similarities -> same = 1 / completely different = 0)
+
+            """
+            EDGE POTENTIALS USING COMPATIBILY MATRIX DEFINED IN THE PAPER
+            -------------------------------------------------------------
+                    Phishy                       Benign
+            Phishy  min(ths+, 1 - sim(x, y))     max(ths−, sim(x, y))
+            Benign  max(ths−, sim(x, y))         min(ths+, 1 - sim(x, y))
+            """
             p_not_related += np.min([compat_threshold1, 1 - G[_to][_from]['sim']]) if i == 0 else np.max([compat_threshold2, G[_to][_from]['sim']])
             p_related += np.max([compat_threshold2, G[_to][_from]['sim']]) if i == 0 else np.min([compat_threshold1, 1 - G[_to][_from]['sim']])
             
@@ -481,7 +492,7 @@ def MAP(G):
 """
 visualse graph with edge weights and stuff
 """
-def visualisie_graph(g):
+def visualise_graph(g):
     pos = nx.spring_layout(g, seed=42)  # Define layout for better aesthetics
 
     # Plot the nodes with different colors based on their type (URL, Domain, Word)
@@ -490,14 +501,15 @@ def visualisie_graph(g):
     word_nodes = [n for n, attr in g.nodes(data=True) if attr.get('type') == 'Word']
 
     # Draw nodes
-    nx.draw_networkx_nodes(g, pos, nodelist=url_nodes, node_size=500, node_color="skyblue", label="URLs")
-    nx.draw_networkx_nodes(g, pos, nodelist=domain_nodes, node_size=500, node_color="lightgreen", label="Domains")
-    nx.draw_networkx_nodes(g, pos, nodelist=word_nodes, node_size=500, node_color="salmon", label="Words")
+    nx.draw_networkx_nodes(g, pos, nodelist=url_nodes, node_size=600, node_color="skyblue", label="URLs")
+    nx.draw_networkx_nodes(g, pos, nodelist=domain_nodes, node_size=300, node_color="lightgreen", label="Domains")
+    nx.draw_networkx_nodes(g, pos, nodelist=word_nodes, node_size=150, node_color="salmon", label="Words")
 
     # Draw edges with weights
-    # If the 'distance' attribute is available, use it to adjust edge width
     edge_weights = [g[u][v].get('distance', 1) for u, v in g.edges()]
     nx.draw_networkx_edges(g, pos, edgelist=g.edges(), width=edge_weights, alpha=0.7, edge_color="gray")
+
+    """
 
     # Draw labels (for nodes)
     node_labels = {}
@@ -507,19 +519,21 @@ def visualisie_graph(g):
             node_labels[node] = attr['label']
     
     nx.draw_networkx_labels(g, pos, labels=node_labels, font_size=10, font_color="black")
+    """
 
     # Optional: Display edge weights as labels on the graph
-    edge_labels = {(u, v): round(g[u][v].get('distance', 0), 2) for u, v in g.edges()}
-    nx.draw_networkx_edge_labels(g, pos, edge_labels=edge_labels, font_size=8)
+    #edge_labels = {(u, v): round(g[u][v].get('distance', 0), 2) for u, v in g.edges()}
+    #nx.draw_networkx_edge_labels(g, pos, edge_labels=edge_labels, font_size=8)
     plt.title("Graph Visualization with Node and Edge Labels")
     plt.legend(scatterpoints=1, loc="upper right", fontsize=10)
     plt.axis('off')  # Turn off the axis
     plt.show()
 
-
-
-        
-        
-
 if __name__ == '__main__':
     main()
+
+"""
+COS similarity with compat_type = table 3 has best results
+followed by Cos, table 2
+rbf, table3. but why ? rbf is recommended so explore why?
+"""
