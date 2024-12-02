@@ -71,7 +71,7 @@ edges between
 Returns:
     N/A
 """
-def add_to_graph(url_entry):
+def add_to_graph(g, url_entry):
     url = url_entry["url"] # fetch url
     if not url.startswith(("http://", "https://")): url = "http://" + url
     parsed = urlparse(url) # parse the url
@@ -92,7 +92,7 @@ def add_to_graph(url_entry):
 
         g.add_edge(url_node, domain_node)
 
-    #  Draw an edge between a URL (i.e., sentence) and a substring (i.e., word)
+    # Draw an edge between a URL (i.e., sentence) and a substring (i.e., word)
     # Segment URL into words and create nodes for each word
     words = segment_url(url)
     for word in words:
@@ -102,7 +102,7 @@ def add_to_graph(url_entry):
 
 # Create graph .....
 for idx, row in df.iterrows():
-    add_to_graph(row)
+    add_to_graph(g, row)
 
 # visualise the graph plot
 def visualise_graph(graph):
@@ -130,16 +130,20 @@ def visualise_graph(graph):
 #visualise_graph(g)
 #print(g)
 
-# Create and save node2vec embeddings
-node2vec = Node2Vec(g, dimensions=64, walk_length=10, num_walks=100, workers=4)
-model = node2vec.fit()
+def save_nodes_and_embeddings(g, dim=64, walk=10, n_walk=100, workers=4):
 
-# save data to data/ dir
-with gzip.open('phishing_url/data/graph.gzpickle', 'wb') as f:
-    pickle.dump(g, f)
+    # Create and save node2vec embeddings
+    node2vec = Node2Vec(g, dimensions=dim, walk_length=walk, num_walks=n_walk, workers=workers)
+    model = node2vec.fit()
 
-with gzip.open("phishing_url/data/graph_embeddings.emb.gzpickle", 'wb') as f:
-    pickle.dump(model.wv, f)  # Saving the word embeddings
+    # save data to data/ dir
+    with gzip.open('phishing_url/data/graph.gzpickle', 'wb') as f:
+        pickle.dump(g, f)
 
-print("Graph complete.")
+    with gzip.open("phishing_url/data/graph_embeddings.emb.gzpickle", 'wb') as f:
+        pickle.dump(model.wv, f)  # Saving the word embeddings
+
+    print("Graph complete.")
+
+#save_nodes_and_embeddings(g)
 

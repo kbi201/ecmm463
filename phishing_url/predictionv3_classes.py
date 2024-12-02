@@ -13,6 +13,7 @@ from datetime import datetime
 from tqdm import tqdm
 from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
+from network_construction import add_to_graph, segment_url, save_nodes_and_embeddings
 
 
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
@@ -33,6 +34,18 @@ class prediction:
             self.compat_threshold2 = compat_threshold2
             self.N_FOLDS = N_FOLDS
             self.max_epochs = max_epochs
+            self.g = None
+
+
+    def test_evasion(self, g, evasion_set):
+
+        #print("start")
+        for test_url in evasion_set:
+            add_to_graph(g, test_url)
+
+        save_nodes_and_embeddings(g)
+        print("Test nodes added to Graph")
+        
 
     """
     we are using dataset found in  https://raw.githubusercontent.com/faizann24/Using-machine-learning-to-detect-malicious-URLs/refs/heads/master/data/data.csv
@@ -44,6 +57,7 @@ class prediction:
         print("Reading data ...")
         # read ground truth data and graph g
         g = pickle.load(gzip.open('phishing_url/data/graph.gzpickle', 'rb')) 
+        self.g = g
         url_truth = pd.read_csv("phishing_url/data/subset_of_data.csv", names=['url', 'label'], skiprows=1)
         data = url_truth['url'].to_list()
         has_ground_truth  = set(data)
@@ -118,6 +132,8 @@ class prediction:
             #print(training_set)
 
             for node in has_ground_truth:
+
+                # labelling training set and givinginit potentials
                 if node in training_set:
                     
                     domain_node = node
@@ -127,7 +143,7 @@ class prediction:
 
                     g.nodes[domain_node]['label'] = 1 if url_truth.loc[url_truth['url'] == node, 'label'].values[0] == "bad" else 0
                     if g.nodes[domain_node]['label'] == 1:      # malicious
-                        g.nodes[domain_node]['data_cost'] = [0.99, 0.01]
+                        g.nodes[domain_node]['data_cost'] = [0.99, 0.01] # we know is malicious so start at 0.99, 0.1
                         mal+=1
                     elif g.nodes[domain_node]['label'] == 0:    # benign
                         g.nodes[domain_node]['data_cost'] = [0.01, 0.99]
@@ -152,7 +168,7 @@ class prediction:
                 max_dist = -float("inf")
                 
                 """
-                calculating edge potentials using simialrity based on some distance measure between nodes, weher that is equclidian distance etc ..
+                calculating distance of nodes which will later be used to calc similarity in edge potentails, weher that is equclidian distance etc ..
                 """
                 for edge in g.edges():
 
@@ -280,6 +296,12 @@ class prediction:
         print("Averaged accuracy: {:.6}".format(avg_acc))
 
         print("End: " + str(datetime.now()))
+
+
+
+        ## conduct test on unseen evasions
+        #self.test_evasion(g)
+
         return avg_precision, avg_recall, avg_f1, avg_acc
 
     """
@@ -442,6 +464,7 @@ class prediction:
         n_wrong_label = 0
         n_correct_label = 0
 
+        # remember the objective is to minimise costs
         for n in G.nodes():
             #print(G.nodes[n])
             nodedata = G.nodes[n]
@@ -473,6 +496,8 @@ class prediction:
             elif (nodedata['label'] == 1 and nodedata['best_label'] == 1) or (nodedata['label'] == 0 and nodedata['best_label'] == 0):
                 n_correct_label += 1
             else:
+
+                # if improper labelling do not consider
                 pass
 
         print("# wrong label: " + str(n_wrong_label))
@@ -557,6 +582,7 @@ if __name__ == '__main__':
     random_trails = 4  # Number of random configurations to try
     best_score = float("-inf")
     best_params = None
+    best_model = None
     config_params = None
 
     for _ in range(random_trails):
@@ -575,9 +601,46 @@ if __name__ == '__main__':
             best_score = score
             best_params = (avg_precision, avg_recall, avg_f1, avg_acc)
             config_params = params
+            best_model = p
 
     print(f"Best Score: {best_score}")
     print(f"Best config: {config_params}")
     print(f"Best Average performance: {best_params}")
+
+
+    ## Now using the best performing graph, test evasions 
+    # containing evasion instances m1, m2, ... m7
+    test_set = [
+        {"url": "015fb31.netsolhost.com/css/ballet-guitars-notfree-mp3", "truth": "1"}, #M1 URL -> benign
+        {"url": "gulsproductionscar.com/bosstweed/notphish/good.html", "truth": "1"}, #M2 Path stgin -> benign
+        {"url": "gulsproductions.com/css/balmoral-hat-green?personID=I4920&tree=ncshawfamily", "truth": "1"}, #M3 Query string -> beniegn
+        {"url": "032255hellooo.com/lincolnhomepage?flow_id=2000&870470=33440/case_id=17188", "truth": "1"}, #M4 domain, path -> benign
+        {"url": "032255hellooo.com/css/ballet-guitars-notfree-mp3?personID=I4920&tree=ncshawfamily", "truth": "1"}, #M5 domain and query -> benign
+        {"url": "015fb31.netsolhost.com/merchant2/merchant.mvc?Screen=CTGY&Store_Code=BC&Category_Code=CP", "truth": "1"}, # M6 path n Query String -> beneign
+        {"url": "01453car.com/", "truth": "0"},
+        {"url": "015fb31.netsolhost.com/bosstweed/notphish/good.html", "truth": "0"},
+        {"url": "02bee66.netsolhosttrustme.com/lincolnhomepage/", "truth": "0"},
+        {"url": "02ec0a3.netsolhosttest.com/getperson.php?personID=I4920&tree=ncshawfamily", "truth": "0"},
+        {"url": "032255hellooo.com/", "truth": "0"}
+    ]
+
+    best_model.test_evasion(best_model.g, test_set)
+    best_model.main() # rerun belief propogation
+    count = 0
+
+    for row in test_set:
+        if not row["url"].startswith(("http://", "https://")): row["url"] = "http://" + row["url"]
+        print(row["url"])
+
+        if row["url"] in best_model.g:
+            model_prediction = best_model.g.nodes[row["url"]]["best_label"]
+            print(f"Prediction  {model_prediction} \n")
+            if model_prediction == int(row["truth"]): count += 1
+
+    print( count / len(test_set) * 100 )
+
+
+    
+    # check labels
 
 
