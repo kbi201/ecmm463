@@ -100,9 +100,7 @@ def add_to_graph(g, url_entry):
         g.add_node(word_node, type="Word") # word
         g.add_edge(url_node, word_node)
 
-# Create graph .....
-for idx, row in df.iterrows():
-    add_to_graph(g, row)
+
 
 # visualise the graph plot
 def visualise_graph(graph):
@@ -132,6 +130,8 @@ def visualise_graph(graph):
 
 def save_nodes_and_embeddings(g, dim=64, walk=10, n_walk=100, workers=4):
 
+    print("hi")
+
     # Create and save node2vec embeddings
     node2vec = Node2Vec(g, dimensions=dim, walk_length=walk, num_walks=n_walk, workers=workers)
     model = node2vec.fit()
@@ -145,5 +145,8 @@ def save_nodes_and_embeddings(g, dim=64, walk=10, n_walk=100, workers=4):
 
     print("Graph complete.")
 
+# Create graph .....
+for idx, row in df.iterrows():
+    add_to_graph(g, row)
 #save_nodes_and_embeddings(g)
 

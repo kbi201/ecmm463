@@ -1,3 +1,5 @@
 *.png
 notes.md
 *.txt
+*.env
+data.csv
