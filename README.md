@@ -6,7 +6,7 @@ An implementation of the network-based method from Kim, Taeri and Park, Noseong 
 
 ## Libraries
 
-To see what libraries we used, please refer to the requirements.txt file provided.
+To see what libraries we used, please refer to the requirements.txt file provided. Note- the requirements.txt file was generated using the line `pip freeze > requirements.txt`
 
 ## To Run Code
 
