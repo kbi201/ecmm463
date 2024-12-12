@@ -10,4 +10,4 @@ To see what libraries we used, please refer to the requirements.txt file provide
 
 ## To Run Code
 
-If you'd like to follow our procedure, please see our prediction.ipynb file in phishing_url and go through it from top to bottom after loading the libraries in requirements.txt.
+If you'd like to follow our procedure, please see our 'prediction.ipynb' file in the 'phishing_url' folder and go through it from top to bottom after loading the libraries in requirements.txt.
